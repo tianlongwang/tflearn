@@ -10,6 +10,8 @@ from ..utils import feed_dict_builder, is_none, get_tensor_parents_placeholders
 class DNN(object):
     """ Deep Neural Network Model.
 
+    TODO: complete description
+
     Arguments:
         network: `Tensor`. Neural network to be used.
         tensorboard_verbose: `int`. Summary verbose level, it accepts
@@ -25,11 +27,17 @@ class DNN(object):
             Default: "/tmp/tflearn_logs/"
         checkpoint_path: `str`. Path to store model checkpoints. If None,
             no model checkpoint will be saved. Default: None.
+        best_checkpoint_path: `str`. Path to store the model when the validation rate reaches its
+            highest point of the current training session and also is above best_val_accuracy. Default: None.
         max_checkpoints: `int` or None. Maximum amount of checkpoints. If
             None, no limit. Default: None.
         session: `Session`. A session for running ops. If None, a new one will
             be created. Note: When providing a session, variables must have been
             initialized already, otherwise an error will be raised.
+        best_val_accuracy: `float` The minimum validation accuracy that needs to be
+            achieved before a model weight's are saved to the best_checkpoint_path. This
+            allows the user to skip early saves and also set a minimum save point when continuing
+            to train a reloaded model. Default: 0.0.
 
     Attributes:
         trainer: `Trainer`. Handle model training.
@@ -39,8 +47,8 @@ class DNN(object):
     """
 
     def __init__(self, network, clip_gradients=5.0, tensorboard_verbose=0,
-                 tensorboard_dir="/tmp/tflearn_logs/", checkpoint_path=None,
-                 max_checkpoints=None, session=None):
+                 tensorboard_dir="/tmp/tflearn_logs/", checkpoint_path=None, best_checkpoint_path=None,
+                 max_checkpoints=None, session=None, best_val_accuracy=0.0):
         assert isinstance(network, tf.Tensor), "'network' arg is not a Tensor!"
         self.net = network
         self.train_ops = tf.get_collection(tf.GraphKeys.TRAIN_OPS)
@@ -49,8 +57,10 @@ class DNN(object):
                                tensorboard_dir=tensorboard_dir,
                                tensorboard_verbose=tensorboard_verbose,
                                checkpoint_path=checkpoint_path,
+                               best_checkpoint_path=best_checkpoint_path,
                                max_checkpoints=max_checkpoints,
-                               session=session)
+                               session=session,
+                               best_val_accuracy=best_val_accuracy)
         self.session = self.trainer.session
 
         self.inputs = tf.get_collection(tf.GraphKeys.INPUTS)
@@ -78,7 +88,7 @@ class DNN(object):
     def fit(self, X_inputs, Y_targets, n_epoch=10, validation_set=None,
             show_metric=False, batch_size=None, shuffle=None,
             snapshot_epoch=True, snapshot_step=None, excl_trainops=None,
-            run_id=None):
+            validation_batch_size=None, run_id=None, callbacks=[]):
         """ Fit.
 
         Train model, feeding X_inputs and Y_targets to the network.
@@ -114,7 +124,11 @@ class DNN(object):
                 `float` (<1) to performs a data split over training data.
             show_metric: `bool`. Display or not accuracy at every step.
             batch_size: `int` or None. If `int`, overrides all network
-                estimators 'batch_size' by this value.
+                estimators 'batch_size' by this value.  Also overrides
+                `valiation_batch_size` if `int`, and if `valudation_batch_size`
+                is None.
+            validation_batch_size: `int` or None. If `int`, overrides all network
+                estimators 'validation_batch_size' by this value.
             shuffle: `bool` or None. If `bool`, overrides all network
                 estimators 'shuffle' by this value.
             snapshot_epoch: `bool`. If True, it will snapshot model at the end
@@ -127,6 +141,8 @@ class DNN(object):
                 exclude from training process (TrainOps can be retrieve
                 through `tf.get_collection_ref(tf.GraphKeys.TRAIN_OPS)`).
             run_id: `str`. Give a name for this run. (Useful for Tensorboard).
+            callbacks: `Callback` or `list`. Custom callbacks to use in the
+                training life cycle
 
         """
         if len(self.train_ops) == 0:
@@ -137,6 +153,13 @@ class DNN(object):
         if batch_size:
             for train_op in self.train_ops:
                 train_op.batch_size = batch_size
+
+        if batch_size is not None and validation_batch_size is None:
+            validation_batch_size = batch_size
+
+        if validation_batch_size:
+            for train_op in self.train_ops:
+                train_op.validation_batch_size = validation_batch_size
 
         valX, valY = None, None
         if validation_set:
@@ -186,7 +209,8 @@ class DNN(object):
                          dprep_dict=dprep_dict,
                          daug_dict=daug_dict,
                          excl_trainops=excl_trainops,
-                         run_id=run_id)
+                         run_id=run_id,
+                         callbacks=callbacks)
 
     def predict(self, X):
         """ Predict.
@@ -216,7 +240,7 @@ class DNN(object):
         #with self.graph.as_default():
         self.trainer.save(model_file)
 
-    def load(self, model_file, weights_only=False):
+    def load(self, model_file, weights_only=False, **optargs):
         """ Load.
 
         Restore model weights.
@@ -227,8 +251,12 @@ class DNN(object):
                 and not intermediate variable, such as step counter, moving
                 averages...). Note that if you are using batch normalization,
                 averages will not be restored as well.
+            optargs: optional extra arguments for trainer.restore (see helpers/trainer.py)
+                     These optional arguments may be used to limit the scope of
+                     variables restored, and to control whether a new session is 
+                     created for the restored variables.
         """
-        self.trainer.restore(model_file, weights_only)
+        self.trainer.restore(model_file, weights_only, **optargs)
         self.session = self.trainer.session
         self.predictor = Evaluator([self.net],
                                    session=self.session,

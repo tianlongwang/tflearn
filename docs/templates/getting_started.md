@@ -13,7 +13,7 @@ Layers are a core feature of TFLearn. While completely defining a model using Te
 - Create and initialize weights and biases variables
 - Apply convolution over incoming tensor
 - Add an activation function after the convolution
-- etc...
+- Etc...
 
 In Tensorflow, writing these kinds of operations can be quite tedious:
 
@@ -45,7 +45,7 @@ File | Layers
 
 ### Built-in Operations
 
-Besides layers concept, TFLearn also provides many different ops to be used when building a neural network. These ops are firstly mean to be be part of the above 'layers' arguments, but they can also be used independently in any other Tensorflow graph for convenience. In practice, just providing the op name as argument is enough (such as activation='relu' or regularizer='L2' for conv_2d), but a function can also be provided for further customization.
+Besides layers concept, TFLearn also provides many different ops to be used when building a neural network. These ops are firstly mean to be part of the above 'layers' arguments, but they can also be used independently in any other Tensorflow graph for convenience. In practice, just providing the op name as argument is enough (such as activation='relu' or regularizer='L2' for conv_2d), but a function can also be provided for further customization.
 
 File | Ops
 -----|----
@@ -229,11 +229,11 @@ network = input_data(shape=[None, 32, 32, 3],
                      data_augmentation=img_aug)
 ```
 
-For more details, see [Data Preprocessing](http://tflearn.org/data_preprocessing) and [Data Augmentation](http://tflearn.org/data_augmentation)
+For more details, see [Data Preprocessing](http://tflearn.org/data_preprocessing) and [Data Augmentation](http://tflearn.org/data_augmentation).
 
 ### Scopes & Weights sharing
 
-All layers are built over 'variable_op_scope', that make it easy to share variables among multiple layers and make TFLearn suitable for distributed training. All layers with inner  variables support a 'scope' argument to place variables under; layers with same scope name will then share the same weights.
+All layers are built over 'variable_op_scope', that makes it easy to share variables among multiple layers and make TFLearn suitable for distributed training. All layers with inner variables support a 'scope' argument to place variables under; layers with same scope name will then share the same weights.
 
 ```python
 # Define a model builder
@@ -242,14 +242,14 @@ def my_model(x):
     x = tflearn.fully_connected(x, 32, scope='fc2')
     x = tflearn.fully_connected(x, 2, scope='out')
 
-# 2 different computation graph but sharing the same weights
-with tf.device('/gpu:0')
+# 2 different computation graphs but sharing the same weights
+with tf.device('/gpu:0'):
     # Force all Variables to reside on the CPU.
     with tf.arg_ops([tflearn.variables.variable], device='/cpu:0'):
         model1 = my_model(placeholder_X)
 # Reuse Variables for the next model
 tf.get_variable_scope().reuse_variables()
-with tf.device('/gpu:1')
+with tf.device('/gpu:1'):
     with tf.arg_ops([tflearn.variables.variable], device='/cpu:0'):
         model2 = my_model(placeholder_X)
 
@@ -259,7 +259,7 @@ with tf.device('/gpu:1')
 
 ### Graph Initialization
 
-It might be useful to limit resources, or assigns more or less GPU RAM memory while training. To do so, a graph initializer can be used to configure a graph before run:
+It might be useful to limit resources, or assign more or less GPU RAM memory while training. To do so, a graph initializer can be used to configure a graph before run:
 
 ```python
 tflearn.init_graph(set_seed=8888, num_cores=16, gpu_memory_fraction=0.5)
@@ -293,7 +293,7 @@ net = tf.nn.max_pool(net, ksize=[1, 2, 2, 1], strides=[1, 2, 2, 1], padding='SAM
 
 ### Built-in Operations
 
-TFLearn built-in ops makes Tensorflow graphs writing faster and more readable. So, similar to layers, built-in ops are fully compatible with any TensorFlow expression. The following code example shows how to use them along with pure Tensorflow API.
+TFLearn built-in ops make Tensorflow graphs writing faster and more readable. So, similar to layers, built-in ops are fully compatible with any TensorFlow expression. The following code example shows how to use them along with pure Tensorflow API.
 
 - See: [builtin_ops.py](https://github.com/tflearn/tflearn/blob/master/examples/extending_tensorflow/builtin_ops.py).
 
@@ -321,7 +321,7 @@ TFLearn implements a `TrainOp` class to represent an optimization process (i.e. 
 trainop = TrainOp(net=my_network, loss=loss, metric=accuracy)
 ```
 
-Then, all TrainOp can be feeded into a `Trainer` class, that will handle the whole training process, considering all TrainOp together as a whole model.
+Then, all TrainOp can be fed into a `Trainer` class, that will handle the whole training process, considering all TrainOp together as a whole model.
 
 ```python
 model = Trainer(trainops=trainop, tensorboard_dir='/tmp/tflearn')
@@ -372,11 +372,59 @@ tflearn.is_training(False)
 
 - See: [training config](http://tflearn.org/config#is_training).
 
+### Training Callbacks
+
+During the training cycle, TFLearn gives you the possibility to track and interact with the metrics of the training throughout a set of functions given by the [Callback](https://github.com/tflearn/tflearn/blob/master/tflearn/callbacks.py#L10) interface.
+To simplify the metrics retreivement, each callback method received a [TrainingState](https://github.com/tflearn/tflearn/blob/master/tflearn/helpers/trainer.py#L950) which track the state (e.g. : current epoch, step, batch iteration) and metrics (e.g. : current validation accuracy, global accuracy etc..)
+
+Callback methods which relate to the training cycle : 
+- `on_train_begin(training_state)`
+- `on_epoch_begin(training_state)`
+- `on_batch_begin(training_state)`
+- `on_sub_batch_begin(training_state)`
+- `on_sub_batch_end(training_state, train_index)`
+- `on_batch_end(training_state, snapshot)`
+- `on_epoch_end(training_state)`
+- `on_train_end(training_state)`
+
+#### How to use it:
+Imagine you have your own monitor which track all your training jobs and you need to send metrics to it. You can easily do this by creating a custom callback which will get data and send it to the distant monitor.
+We need to create a CustomCallback and add your logic in the `on_epoch_end` which is called at the end of an epoch.
+
+This will give you something like that:
+```python
+class MonitorCallback(tflearn.callbacks.Callback):
+    def __init__(self, api):
+        self.my_monitor_api = api
+    
+    def on_epoch_end(self, training_state):
+        self.my_monitor_api.send({
+            accuracy: training_state.global_acc,
+            loss: training_state.global_loss,
+        })
+
+```
+
+Then you just need to add it on the `model.fit` call
+
+```python
+
+
+monitorCallback = new MonitorCallback(api)
+model = ...
+
+model.fit(..., callbacks=monitorCallback)
+
+```
+
+The `callbacks` argument can take a `Callback` or a `list` of callbacks.
+That's it, your custom callback will be automatically called at each epoch end.
+
 ### Variables
 
 TFLearn defines a set of functions for users to quickly define variables.
 
-While in Tensorflow, variable creation requires predefined value or initializer, as well as an explicit device placement, TFLearn simplify variable definition:
+While in Tensorflow, variable creation requires predefined value or initializer, as well as an explicit device placement, TFLearn simplifies variable definition:
 
 ```python
 import tflearn.variables as vs

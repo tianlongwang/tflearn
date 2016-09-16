@@ -36,16 +36,17 @@ from .variables import variable, get_all_trainable_variable, \
     get_all_variables, get_layer_variables_by_name
 from .objectives import categorical_crossentropy, binary_crossentropy, \
     softmax_categorical_crossentropy, hinge_loss, mean_square
-from .metrics import Top_k, Accuracy, R2, top_k_op, accuracy_op, r2_op
+from .metrics import Top_k, Accuracy, R2, top_k_op, accuracy_op, r2_op, Prediction_Counts
 
 # Direct layers inclusion
 from . import layers
 from .layers.conv import conv_2d, max_pool_2d, avg_pool_2d, conv_1d, \
     highway_conv_2d, highway_conv_1d, max_pool_1d, avg_pool_1d, \
     global_avg_pool, residual_block, residual_bottleneck, \
-    conv_2d_transpose, upsample_2d
+    conv_2d_transpose, upsample_2d, conv_3d, max_pool_3d, avg_pool_3d
 from .layers.core import input_data, dropout, custom_layer, reshape, \
-    flatten, activation, fully_connected, single_unit, highway, one_hot_encoding
+    flatten, activation, fully_connected, single_unit, highway, \
+    one_hot_encoding, time_distributed
 from .layers.normalization import batch_normalization, local_response_normalization
 from .layers.estimator import regression
 from .layers.recurrent import lstm, gru, simple_rnn, bidirectional_rnn, \
@@ -64,3 +65,6 @@ from .utils import get_layer_by_name
 # Data Utils
 from .data_augmentation import DataAugmentation, ImageAugmentation, SequenceAugmentation
 from .data_preprocessing import DataPreprocessing, ImagePreprocessing, SequencePreprocessing
+
+# Init training mode
+config.init_training_mode()
